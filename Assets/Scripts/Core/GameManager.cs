@@ -11,6 +11,8 @@ public class GameManager : MonoBehaviour
     public InventorySystem Inventory { get; private set; }
     public OrderSystem Orders { get; private set; }
     public BouquetSystem Bouquet { get; private set; }
+    public ChargeHarvestSystem ChargeHarvest { get; private set; }
+    public ChargeHarvestConfig ChargeHarvestConfig { get; private set; }
 
     private Transform orderRoot;
     private readonly List<OrderView> orderViews = new List<OrderView>();
@@ -29,6 +31,7 @@ public class GameManager : MonoBehaviour
         EnsureOrderSystem();
         EnsureBouquetSystem();
         EnsureInventorySystem();
+        EnsureChargeHarvestSystem();
     }
 
     private void ConfigureCamera()
@@ -107,6 +110,23 @@ public class GameManager : MonoBehaviour
         }
 
         bouquetDropZone.Initialize(Bouquet, Orders);
+    }
+
+    private void EnsureChargeHarvestSystem()
+    {
+        ChargeHarvestConfig = GetComponent<ChargeHarvestConfig>();
+        if (ChargeHarvestConfig == null)
+        {
+            ChargeHarvestConfig = gameObject.AddComponent<ChargeHarvestConfig>();
+        }
+
+        ChargeHarvest = GetComponent<ChargeHarvestSystem>();
+        if (ChargeHarvest == null)
+        {
+            ChargeHarvest = gameObject.AddComponent<ChargeHarvestSystem>();
+        }
+
+        ChargeHarvest.Initialize(ChargeHarvestConfig);
     }
 
     private void EnsureOrderRoot()

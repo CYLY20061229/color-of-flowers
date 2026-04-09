@@ -10,17 +10,23 @@ public class BranchController : MonoBehaviour
     [SerializeField] private Vector3 bodyLocalPosition = new Vector3(0f, -0.35f, 0f);
     [SerializeField] private Vector3 markerLocalPosition = new Vector3(0f, 0.35f, 0f);
     [SerializeField] private Vector3 previewLocalPosition = new Vector3(0f, 1.05f, 0f);
+    [SerializeField] private Vector3 growthBarLocalPosition = new Vector3(0f, -1.1f, 0f);
+    [SerializeField] private Vector2 growthBarSize = new Vector2(0.9f, 0.12f);
 
     private GameObject bodyVisual;
     private GameObject colorMarkerVisual;
     private GameObject previewFlowerVisual;
     private GameObject matureFlowerVisual;
+    private GameObject growthBarRoot;
+    private GameObject growthBarBackground;
+    private GameObject growthBarFill;
     private BoxCollider2D interactionCollider;
     private GrowthSystem growthSystem;
 
     public BranchData Data { get; private set; }
     public FlowerColor CurrentColor => Data.CurrentColor;
     public bool IsPreviewVisible => previewFlowerVisual != null && previewFlowerVisual.activeSelf;
+    public int DamageLevel => Data.DamageLevel;
 
     public void Initialize(BranchData data, BranchVisualSettings visualSettings)
     {
@@ -32,6 +38,7 @@ public class BranchController : MonoBehaviour
 
         gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}";
         EnsureVisuals();
+        EnsureChargeHarvestSubscription();
         RefreshVisuals();
     }
 
@@ -77,6 +84,16 @@ public class BranchController : MonoBehaviour
         Data.SetState(BranchState.Idle);
         RefreshVisuals();
         return true;
+    }
+
+    public bool TryStartChargeHarvestFromMatureFlower()
+    {
+        if (Data.State != BranchState.Mature || GameManager.Instance == null || GameManager.Instance.ChargeHarvest == null)
+        {
+            return false;
+        }
+
+        return GameManager.Instance.ChargeHarvest.StartChargeHarvest(this);
     }
 
     public bool IsWorldPointInsideMatureFlower(Vector3 worldPoint)
@@ -133,8 +150,29 @@ public class BranchController : MonoBehaviour
         RefreshVisuals();
     }
 
+    public void ApplyChargeHarvestResult(HarvestResult result)
+    {
+        if (GameManager.Instance == null || GameManager.Instance.ChargeHarvestConfig == null)
+        {
+            return;
+        }
+
+        switch (result)
+        {
+            case HarvestResult.Perfect:
+                Data.ReduceDamage(GameManager.Instance.ChargeHarvestConfig.PerfectDamageRecovery);
+                break;
+            case HarvestResult.Bad:
+                Data.IncreaseDamage(GameManager.Instance.ChargeHarvestConfig.BadDamageIncrease);
+                break;
+        }
+
+        TryHarvestMatureFlower();
+    }
+
     public void RefreshVisuals()
     {
+        gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}_Dmg{Data.DamageLevel}";
         Color branchColor = FlowerColorPalette.ToUnityColor(Data.CurrentColor);
         SimpleShapeFactory.SetColor(colorMarkerVisual, branchColor);
         SimpleShapeFactory.SetColor(previewFlowerVisual, branchColor);
@@ -144,6 +182,37 @@ public class BranchController : MonoBehaviour
         colorMarkerVisual.SetActive(!mature);
         matureFlowerVisual.SetActive(mature);
         previewFlowerVisual.SetActive(false);
+        if (Data.State != BranchState.Growing)
+        {
+            SetGrowthProgressVisible(false);
+        }
+    }
+
+    public void BeginGrowthProgress(float totalDurationSeconds)
+    {
+        SetGrowthProgressVisible(true);
+        UpdateGrowthProgress(0f, totalDurationSeconds);
+    }
+
+    public void UpdateGrowthProgress(float elapsedSeconds, float totalDurationSeconds)
+    {
+        if (growthBarFill == null)
+        {
+            return;
+        }
+
+        float normalizedProgress = totalDurationSeconds <= 0f ? 1f : Mathf.Clamp01(elapsedSeconds / totalDurationSeconds);
+        float fullWidth = growthBarSize.x - 0.06f;
+        float fillWidth = Mathf.Max(0.02f, fullWidth * normalizedProgress);
+
+        MeshFilter filter = growthBarFill.GetComponent<MeshFilter>();
+        filter.sharedMesh = CreateProgressBarMesh(fillWidth, growthBarSize.y - 0.04f);
+        growthBarFill.transform.localPosition = new Vector3(-fullWidth * 0.5f + fillWidth * 0.5f, 0f, -0.01f);
+    }
+
+    public void EndGrowthProgress()
+    {
+        SetGrowthProgressVisible(false);
     }
 
     private void EnsureVisuals()
@@ -172,6 +241,17 @@ public class BranchController : MonoBehaviour
             matureFlowerVisual = SimpleShapeFactory.CreateTriangle("MatureFlower", transform, previewFlowerSize, Color.white, 2);
             matureFlowerVisual.transform.localPosition = markerLocalPosition;
             matureFlowerVisual.SetActive(false);
+        }
+
+        if (growthBarRoot == null)
+        {
+            growthBarRoot = new GameObject("GrowthBarRoot");
+            growthBarRoot.transform.SetParent(transform, false);
+            growthBarRoot.transform.localPosition = growthBarLocalPosition;
+
+            growthBarBackground = SimpleShapeFactory.CreateRectangle("GrowthBarBackground", growthBarRoot.transform, growthBarSize, new Color(0.14f, 0.14f, 0.16f, 0.95f), 2);
+            growthBarFill = SimpleShapeFactory.CreateRectangle("GrowthBarFill", growthBarRoot.transform, new Vector2(growthBarSize.x - 0.06f, growthBarSize.y - 0.04f), new Color(0.38f, 0.9f, 0.42f, 1f), 3);
+            SetGrowthProgressVisible(false);
         }
 
         EnsureCollider();
@@ -223,6 +303,27 @@ public class BranchController : MonoBehaviour
         growthSystem.Initialize(this);
     }
 
+    private void EnsureChargeHarvestSubscription()
+    {
+        if (GameManager.Instance == null || GameManager.Instance.ChargeHarvest == null)
+        {
+            return;
+        }
+
+        GameManager.Instance.ChargeHarvest.ChargeHarvestFinished -= HandleChargeHarvestFinished;
+        GameManager.Instance.ChargeHarvest.ChargeHarvestFinished += HandleChargeHarvestFinished;
+    }
+
+    private void HandleChargeHarvestFinished(BranchController targetBranch, HarvestResult result)
+    {
+        if (targetBranch != this)
+        {
+            return;
+        }
+
+        ApplyChargeHarvestResult(result);
+    }
+
     private static bool IsPointInTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
     {
         float area = GetTriangleSign(a, b, c);
@@ -238,5 +339,32 @@ public class BranchController : MonoBehaviour
     private static float GetTriangleSign(Vector2 a, Vector2 b, Vector2 c)
     {
         return (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y);
+    }
+
+    private void SetGrowthProgressVisible(bool isVisible)
+    {
+        if (growthBarRoot != null)
+        {
+            growthBarRoot.SetActive(isVisible);
+        }
+    }
+
+    private static Mesh CreateProgressBarMesh(float width, float height)
+    {
+        float halfWidth = width * 0.5f;
+        float halfHeight = height * 0.5f;
+
+        Mesh mesh = new Mesh();
+        mesh.name = "GrowthProgressBar";
+        mesh.vertices = new[]
+        {
+            new Vector3(-halfWidth, -halfHeight, 0f),
+            new Vector3(halfWidth, -halfHeight, 0f),
+            new Vector3(-halfWidth, halfHeight, 0f),
+            new Vector3(halfWidth, halfHeight, 0f)
+        };
+        mesh.triangles = new[] { 0, 2, 1, 2, 3, 1 };
+        mesh.RecalculateBounds();
+        return mesh;
     }
 }

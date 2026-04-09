@@ -28,9 +28,32 @@ public class GrowthSystem : MonoBehaviour
 
     private IEnumerator Grow(FlowerColor flowerColor)
     {
+        float totalDurationSeconds = GetGrowthDurationSeconds();
+        float elapsedSeconds = 0f;
+
         branch.SetGrowing(flowerColor);
-        yield return new WaitForSeconds(growthDurationSeconds);
+        branch.BeginGrowthProgress(totalDurationSeconds);
+
+        while (elapsedSeconds < totalDurationSeconds)
+        {
+            elapsedSeconds += Time.deltaTime;
+            branch.UpdateGrowthProgress(elapsedSeconds, totalDurationSeconds);
+            yield return null;
+        }
+
+        branch.EndGrowthProgress();
         branch.SetMature(flowerColor);
         growthRoutine = null;
+    }
+
+    private float GetGrowthDurationSeconds()
+    {
+        float damagePenalty = 0f;
+        if (GameManager.Instance != null && GameManager.Instance.ChargeHarvestConfig != null && branch != null && branch.Data != null)
+        {
+            damagePenalty = branch.Data.DamageLevel * GameManager.Instance.ChargeHarvestConfig.DamageGrowthPenaltySeconds;
+        }
+
+        return growthDurationSeconds + damagePenalty;
     }
 }

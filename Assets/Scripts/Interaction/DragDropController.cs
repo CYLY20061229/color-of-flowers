@@ -90,7 +90,7 @@ public class DragDropController : MonoBehaviour
         }
         else if (branch.IsWorldPointInsideMatureFlower(mouseWorldPosition))
         {
-            branch.TryHarvestMatureFlower();
+            branch.TryStartChargeHarvestFromMatureFlower();
         }
 
         isPointerDown = false;
