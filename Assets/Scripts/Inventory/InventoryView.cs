@@ -9,11 +9,12 @@ public class InventoryView : MonoBehaviour
 
     private InventorySystem inventorySystem;
     private BouquetSystem bouquetSystem;
+    private BouquetOrderManager bouquetOrderManager;
     private TextMesh label;
     private Transform itemRoot;
     private readonly List<InventoryFlowerItemView> itemViews = new List<InventoryFlowerItemView>();
 
-    public void Initialize(InventorySystem inventory, BouquetSystem bouquet = null)
+    public void Initialize(InventorySystem inventory, BouquetSystem bouquet = null, BouquetOrderManager bouquetOrders = null)
     {
         if (inventorySystem != null)
         {
@@ -25,13 +26,24 @@ public class InventoryView : MonoBehaviour
             bouquetSystem.BouquetChanged -= Refresh;
         }
 
+        if (bouquetOrderManager != null)
+        {
+            bouquetOrderManager.BouquetOrderChanged -= Refresh;
+        }
+
         inventorySystem = inventory;
         bouquetSystem = bouquet;
+        bouquetOrderManager = bouquetOrders;
         inventorySystem.InventoryChanged += Refresh;
 
         if (bouquetSystem != null)
         {
             bouquetSystem.BouquetChanged += Refresh;
+        }
+
+        if (bouquetOrderManager != null)
+        {
+            bouquetOrderManager.BouquetOrderChanged += Refresh;
         }
 
         EnsureVisuals();
@@ -49,6 +61,11 @@ public class InventoryView : MonoBehaviour
         {
             bouquetSystem.BouquetChanged -= Refresh;
         }
+
+        if (bouquetOrderManager != null)
+        {
+            bouquetOrderManager.BouquetOrderChanged -= Refresh;
+        }
     }
 
     private void EnsureVisuals()
@@ -59,6 +76,7 @@ public class InventoryView : MonoBehaviour
         }
 
         SimpleShapeFactory.CreateRectangle("InventoryPanel", transform, new Vector2(PanelWidth, PanelHeight), new Color(0.08f, 0.08f, 0.08f, 0.75f), 10);
+        EnsureDropCollider();
 
         GameObject labelObject = new GameObject("InventoryLabel");
         labelObject.transform.SetParent(transform, false);
@@ -80,6 +98,18 @@ public class InventoryView : MonoBehaviour
         itemRoot = itemRootObject.transform;
     }
 
+    private void EnsureDropCollider()
+    {
+        BoxCollider2D collider = GetComponent<BoxCollider2D>();
+        if (collider == null)
+        {
+            collider = gameObject.AddComponent<BoxCollider2D>();
+        }
+
+        collider.isTrigger = true;
+        collider.size = new Vector2(PanelWidth, PanelHeight);
+    }
+
     private void Refresh()
     {
         if (inventorySystem == null || label == null)
@@ -89,7 +119,7 @@ public class InventoryView : MonoBehaviour
 
         StringBuilder builder = new StringBuilder();
         builder.AppendLine("Flower Basket");
-        builder.AppendLine(bouquetSystem != null ? "Click flower to submit" : "");
+        builder.AppendLine(bouquetOrderManager != null && bouquetOrderManager.HasActiveBouquetOrder ? "Drag flower to slot" : "Click flower to submit");
 
         if (inventorySystem.Flowers.Count == 0)
         {
@@ -118,7 +148,7 @@ public class InventoryView : MonoBehaviour
             itemObject.transform.localPosition = new Vector3(0f, -itemIndex * 0.34f, -0.02f);
 
             InventoryFlowerItemView itemView = itemObject.AddComponent<InventoryFlowerItemView>();
-            itemView.Initialize(color, count, bouquetSystem);
+            itemView.Initialize(color, count, bouquetSystem, bouquetOrderManager);
             itemViews.Add(itemView);
 
             itemIndex++;

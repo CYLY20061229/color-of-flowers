@@ -106,7 +106,7 @@ public class OrderView : MonoBehaviour
 
         StringBuilder builder = new StringBuilder();
         builder.AppendLine(selected ? $"Customer #{orderData.Id} Selected" : $"Customer #{orderData.Id}");
-        builder.AppendLine("Click to submit");
+        builder.AppendLine(orderData.HasBouquetOrder ? "Bouquet Order" : "Click to submit");
         builder.AppendLine();
 
         for (int i = 0; i < orderData.Requirements.Count; i++)

@@ -75,33 +75,27 @@ public class OrderSystem : MonoBehaviour
 
     private OrderData CreateOrder(int id)
     {
+        BouquetOrderData bouquetOrder;
         switch ((id - 1) % 4)
         {
             case 0:
-                return new OrderData(id, new[]
-                {
-                    new OrderRequirement(FlowerColor.Red, 2),
-                    new OrderRequirement(FlowerColor.Magenta, 1)
-                });
+                bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Magenta, FlowerColor.Red, FlowerColor.Red);
+                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
             case 1:
-                return new OrderData(id, new[]
-                {
-                    new OrderRequirement(FlowerColor.Green, 2),
-                    new OrderRequirement(FlowerColor.Cyan, 1)
-                });
+                bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Cyan, FlowerColor.Green, FlowerColor.Green);
+                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
             case 2:
-                return new OrderData(id, new[]
-                {
-                    new OrderRequirement(FlowerColor.Blue, 2),
-                    new OrderRequirement(FlowerColor.Yellow, 1)
-                });
+                bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Yellow, FlowerColor.Blue, FlowerColor.Blue);
+                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
             default:
-                return new OrderData(id, new[]
-                {
-                    new OrderRequirement(FlowerColor.Red, 1),
-                    new OrderRequirement(FlowerColor.Green, 1),
-                    new OrderRequirement(FlowerColor.Blue, 1)
-                });
+                bouquetOrder = BouquetTemplateFactory.CreateFiveFlowerTemplate(
+                    id,
+                    FlowerColor.White,
+                    FlowerColor.Red,
+                    FlowerColor.Green,
+                    FlowerColor.Blue,
+                    FlowerColor.Yellow);
+                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
         }
     }
 }

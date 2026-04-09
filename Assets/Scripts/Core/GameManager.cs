@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     public InventorySystem Inventory { get; private set; }
     public OrderSystem Orders { get; private set; }
     public BouquetSystem Bouquet { get; private set; }
+    public BouquetOrderManager BouquetOrders { get; private set; }
     public ChargeHarvestSystem ChargeHarvest { get; private set; }
     public ChargeHarvestConfig ChargeHarvestConfig { get; private set; }
 
@@ -27,9 +28,11 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         ConfigureCamera();
+        EnsureBackground();
         EnsureInventorySystem();
         EnsureOrderSystem();
         EnsureBouquetSystem();
+        EnsureBouquetOrderSystem();
         EnsureInventorySystem();
         EnsureChargeHarvestSystem();
     }
@@ -56,6 +59,18 @@ public class GameManager : MonoBehaviour
         mainCamera.transform.position = new Vector3(0f, 0f, -10f);
     }
 
+    private void EnsureBackground()
+    {
+        BackgroundView backgroundView = FindFirstObjectByType<BackgroundView>();
+        if (backgroundView == null)
+        {
+            GameObject backgroundObject = new GameObject("BackgroundView");
+            backgroundView = backgroundObject.AddComponent<BackgroundView>();
+        }
+
+        backgroundView.Initialize(mainCamera);
+    }
+
     private void EnsureInventorySystem()
     {
         Inventory = GetComponent<InventorySystem>();
@@ -72,7 +87,7 @@ public class GameManager : MonoBehaviour
             inventoryView = inventoryViewObject.AddComponent<InventoryView>();
         }
 
-        inventoryView.Initialize(Inventory, Bouquet);
+        inventoryView.Initialize(Inventory, Bouquet, BouquetOrders);
     }
 
     private void EnsureOrderSystem()
@@ -110,6 +125,27 @@ public class GameManager : MonoBehaviour
         }
 
         bouquetDropZone.Initialize(Bouquet, Orders);
+    }
+
+    private void EnsureBouquetOrderSystem()
+    {
+        BouquetOrders = GetComponent<BouquetOrderManager>();
+        if (BouquetOrders == null)
+        {
+            BouquetOrders = gameObject.AddComponent<BouquetOrderManager>();
+        }
+
+        BouquetOrders.Initialize(Inventory, Orders);
+
+        BouquetLayoutView bouquetLayoutView = FindFirstObjectByType<BouquetLayoutView>();
+        if (bouquetLayoutView == null)
+        {
+            GameObject bouquetLayoutObject = new GameObject("BouquetLayoutView");
+            bouquetLayoutObject.transform.position = new Vector3(-4.25f, -2.85f, 0f);
+            bouquetLayoutView = bouquetLayoutObject.AddComponent<BouquetLayoutView>();
+        }
+
+        bouquetLayoutView.Initialize(BouquetOrders);
     }
 
     private void EnsureChargeHarvestSystem()

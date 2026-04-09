@@ -10,17 +10,25 @@ public class InventoryFlowerItemView : MonoBehaviour
     private TextMesh label;
     private GameObject background;
     private BouquetSystem bouquetSystem;
+    private BouquetOrderManager bouquetOrderManager;
 
-    public void Initialize(FlowerColor flowerColor, int count, BouquetSystem bouquet)
+    public void Initialize(FlowerColor flowerColor, int count, BouquetSystem bouquet, BouquetOrderManager bouquetOrders = null)
     {
         color = flowerColor;
         bouquetSystem = bouquet;
+        bouquetOrderManager = bouquetOrders;
         EnsureVisuals();
+        EnsureDragHandler();
         Refresh(count);
     }
 
     private void OnMouseDown()
     {
+        if (bouquetOrderManager != null && bouquetOrderManager.HasActiveBouquetOrder)
+        {
+            return;
+        }
+
         if (bouquetSystem == null)
         {
             return;
@@ -68,5 +76,21 @@ public class InventoryFlowerItemView : MonoBehaviour
             ? new Color(0.16f, 0.32f, 0.2f, 0.95f)
             : new Color(0.16f, 0.16f, 0.16f, 0.9f);
         SimpleShapeFactory.SetColor(background, backgroundColor);
+    }
+
+    private void EnsureDragHandler()
+    {
+        if (bouquetOrderManager == null)
+        {
+            return;
+        }
+
+        FlowerDragToSlotHandler dragHandler = GetComponent<FlowerDragToSlotHandler>();
+        if (dragHandler == null)
+        {
+            dragHandler = gameObject.AddComponent<FlowerDragToSlotHandler>();
+        }
+
+        dragHandler.Initialize(color, bouquetOrderManager);
     }
 }
