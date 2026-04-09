@@ -14,9 +14,11 @@ public class BranchFactory : MonoBehaviour
 
     [Header("Branch Visuals")]
     [SerializeField] private Vector2 branchBodySize = new Vector2(0.25f, 1f);
-    [SerializeField] private float colorMarkerRadius = 0.32f;
     [SerializeField] private Vector2 previewFlowerSize = new Vector2(0.7f, 0.6f);
     [SerializeField] private Vector3 previewLocalPosition = new Vector3(0f, 1.05f, 0f);
+    [SerializeField] private Sprite budSprite;
+    [SerializeField] private Sprite grownSprite;
+    [SerializeField] private Vector3 flowerVisualScale = new Vector3(0.6f, 0.6f, 1f);
 
     private readonly List<BranchController> spawnedBranches = new List<BranchController>();
 
@@ -35,6 +37,7 @@ public class BranchFactory : MonoBehaviour
         }
 
         EnsureBranchRoot();
+        EnsureFlowerSprites();
 
         FlowerColor[] baseColors = { FlowerColor.Red, FlowerColor.Green, FlowerColor.Blue };
         int branchIndex = 0;
@@ -67,9 +70,11 @@ public class BranchFactory : MonoBehaviour
         return new BranchVisualSettings
         {
             BranchBodySize = branchBodySize,
-            ColorMarkerRadius = colorMarkerRadius,
             PreviewFlowerSize = previewFlowerSize,
-            PreviewLocalPosition = previewLocalPosition
+            PreviewLocalPosition = previewLocalPosition,
+            BudSprite = budSprite,
+            GrownSprite = grownSprite,
+            FlowerVisualScale = flowerVisualScale
         };
     }
 
@@ -87,5 +92,39 @@ public class BranchFactory : MonoBehaviour
         }
 
         branchRoot = rootObject.transform;
+    }
+
+    private void EnsureFlowerSprites()
+    {
+        if (budSprite == null)
+        {
+            budSprite = LoadSpriteResource("Flowers/idle");
+        }
+
+        if (grownSprite == null)
+        {
+            grownSprite = LoadSpriteResource("Flowers/grown");
+        }
+    }
+
+    private Sprite LoadSpriteResource(string resourcePath)
+    {
+        Sprite sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite != null)
+        {
+            return sprite;
+        }
+
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+        if (texture == null)
+        {
+            return null;
+        }
+
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            512f);
     }
 }

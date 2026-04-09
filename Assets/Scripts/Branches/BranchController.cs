@@ -5,7 +5,6 @@ public class BranchController : MonoBehaviour
 {
     [Header("Shape Layout")]
     [SerializeField] private Vector2 branchBodySize = new Vector2(0.25f, 1f);
-    [SerializeField] private float colorMarkerRadius = 0.32f;
     [SerializeField] private Vector2 previewFlowerSize = new Vector2(0.7f, 0.6f);
     [SerializeField] private Vector3 bodyLocalPosition = new Vector3(0f, -0.35f, 0f);
     [SerializeField] private Vector3 markerLocalPosition = new Vector3(0f, 0.35f, 0f);
@@ -14,9 +13,12 @@ public class BranchController : MonoBehaviour
     [SerializeField] private Vector2 growthBarSize = new Vector2(0.9f, 0.12f);
 
     private GameObject bodyVisual;
-    private GameObject colorMarkerVisual;
-    private GameObject previewFlowerVisual;
-    private GameObject matureFlowerVisual;
+    private Sprite budSprite;
+    private Sprite grownSprite;
+    private Vector3 flowerVisualScale = Vector3.one;
+    private SpriteRenderer colorMarkerRenderer;
+    private SpriteRenderer previewFlowerRenderer;
+    private SpriteRenderer matureFlowerRenderer;
     private GameObject growthBarRoot;
     private GameObject growthBarBackground;
     private GameObject growthBarFill;
@@ -25,16 +27,18 @@ public class BranchController : MonoBehaviour
 
     public BranchData Data { get; private set; }
     public FlowerColor CurrentColor => Data.CurrentColor;
-    public bool IsPreviewVisible => previewFlowerVisual != null && previewFlowerVisual.activeSelf;
+    public bool IsPreviewVisible => previewFlowerRenderer != null && previewFlowerRenderer.gameObject.activeSelf;
     public int DamageLevel => Data.DamageLevel;
 
     public void Initialize(BranchData data, BranchVisualSettings visualSettings)
     {
         Data = data;
         branchBodySize = visualSettings.BranchBodySize;
-        colorMarkerRadius = visualSettings.ColorMarkerRadius;
         previewFlowerSize = visualSettings.PreviewFlowerSize;
         previewLocalPosition = visualSettings.PreviewLocalPosition;
+        budSprite = visualSettings.BudSprite;
+        grownSprite = visualSettings.GrownSprite;
+        flowerVisualScale = visualSettings.FlowerVisualScale == Vector3.zero ? Vector3.one : visualSettings.FlowerVisualScale;
 
         gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}";
         EnsureVisuals();
@@ -49,12 +53,15 @@ public class BranchController : MonoBehaviour
             return;
         }
 
-        previewFlowerVisual.SetActive(true);
+        previewFlowerRenderer.gameObject.SetActive(true);
     }
 
     public void HidePreview()
     {
-        previewFlowerVisual.SetActive(false);
+        if (previewFlowerRenderer != null)
+        {
+            previewFlowerRenderer.gameObject.SetActive(false);
+        }
     }
 
     public FlowerColor GetPreviewFlowerColor()
@@ -98,36 +105,17 @@ public class BranchController : MonoBehaviour
 
     public bool IsWorldPointInsideMatureFlower(Vector3 worldPoint)
     {
-        if (Data.State != BranchState.Mature)
-        {
-            return false;
-        }
-
-        Vector3 localPoint = transform.InverseTransformPoint(worldPoint) - markerLocalPosition;
-        float halfWidth = previewFlowerSize.x * 0.5f;
-        float halfHeight = previewFlowerSize.y * 0.5f;
-
-        Vector2 top = new Vector2(0f, halfHeight);
-        Vector2 bottomLeft = new Vector2(-halfWidth, -halfHeight);
-        Vector2 bottomRight = new Vector2(halfWidth, -halfHeight);
-        return IsPointInTriangle(localPoint, top, bottomLeft, bottomRight);
+        return Data.State == BranchState.Mature
+            && matureFlowerRenderer != null
+            && matureFlowerRenderer.gameObject.activeSelf
+            && matureFlowerRenderer.bounds.Contains(worldPoint);
     }
 
     public bool IsWorldPointInsidePreviewFlower(Vector3 worldPoint)
     {
-        if (!IsPreviewVisible)
-        {
-            return false;
-        }
-
-        Vector3 localPoint = transform.InverseTransformPoint(worldPoint) - previewLocalPosition;
-        float halfWidth = previewFlowerSize.x * 0.5f;
-        float halfHeight = previewFlowerSize.y * 0.5f;
-
-        Vector2 top = new Vector2(0f, halfHeight);
-        Vector2 bottomLeft = new Vector2(-halfWidth, -halfHeight);
-        Vector2 bottomRight = new Vector2(halfWidth, -halfHeight);
-        return IsPointInTriangle(localPoint, top, bottomLeft, bottomRight);
+        return IsPreviewVisible
+            && previewFlowerRenderer != null
+            && previewFlowerRenderer.bounds.Contains(worldPoint);
     }
 
     public void SetGrowing(FlowerColor flowerColor)
@@ -174,14 +162,37 @@ public class BranchController : MonoBehaviour
     {
         gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}_Dmg{Data.DamageLevel}";
         Color branchColor = FlowerColorPalette.ToUnityColor(Data.CurrentColor);
-        SimpleShapeFactory.SetColor(colorMarkerVisual, branchColor);
-        SimpleShapeFactory.SetColor(previewFlowerVisual, branchColor);
-        SimpleShapeFactory.SetColor(matureFlowerVisual, branchColor);
+
+        if (colorMarkerRenderer != null)
+        {
+            colorMarkerRenderer.sprite = budSprite;
+            colorMarkerRenderer.color = branchColor;
+        }
+
+        if (previewFlowerRenderer != null)
+        {
+            previewFlowerRenderer.sprite = grownSprite;
+            previewFlowerRenderer.color = branchColor;
+        }
+
+        if (matureFlowerRenderer != null)
+        {
+            matureFlowerRenderer.sprite = grownSprite;
+            matureFlowerRenderer.color = branchColor;
+        }
 
         bool mature = Data.State == BranchState.Mature;
-        colorMarkerVisual.SetActive(!mature);
-        matureFlowerVisual.SetActive(mature);
-        previewFlowerVisual.SetActive(false);
+        if (colorMarkerRenderer != null)
+        {
+            colorMarkerRenderer.gameObject.SetActive(!mature);
+        }
+
+        if (matureFlowerRenderer != null)
+        {
+            matureFlowerRenderer.gameObject.SetActive(mature);
+        }
+
+        HidePreview();
         if (Data.State != BranchState.Growing)
         {
             SetGrowthProgressVisible(false);
@@ -223,24 +234,21 @@ public class BranchController : MonoBehaviour
             bodyVisual.transform.localPosition = bodyLocalPosition;
         }
 
-        if (colorMarkerVisual == null)
+        if (colorMarkerRenderer == null)
         {
-            colorMarkerVisual = SimpleShapeFactory.CreateCircle("ColorMarker", transform, colorMarkerRadius, Color.white, 1);
-            colorMarkerVisual.transform.localPosition = markerLocalPosition;
+            colorMarkerRenderer = CreateFlowerSpriteRenderer("BudVisual", markerLocalPosition, 1);
         }
 
-        if (previewFlowerVisual == null)
+        if (previewFlowerRenderer == null)
         {
-            previewFlowerVisual = SimpleShapeFactory.CreateTriangle("PreviewFlower", transform, previewFlowerSize, Color.white, 2);
-            previewFlowerVisual.transform.localPosition = previewLocalPosition;
-            previewFlowerVisual.SetActive(false);
+            previewFlowerRenderer = CreateFlowerSpriteRenderer("PreviewFlower", previewLocalPosition, 2);
+            previewFlowerRenderer.gameObject.SetActive(false);
         }
 
-        if (matureFlowerVisual == null)
+        if (matureFlowerRenderer == null)
         {
-            matureFlowerVisual = SimpleShapeFactory.CreateTriangle("MatureFlower", transform, previewFlowerSize, Color.white, 2);
-            matureFlowerVisual.transform.localPosition = markerLocalPosition;
-            matureFlowerVisual.SetActive(false);
+            matureFlowerRenderer = CreateFlowerSpriteRenderer("MatureFlower", markerLocalPosition, 2);
+            matureFlowerRenderer.gameObject.SetActive(false);
         }
 
         if (growthBarRoot == null)
@@ -260,14 +268,28 @@ public class BranchController : MonoBehaviour
         EnsureGrowthSystem();
     }
 
+    private SpriteRenderer CreateFlowerSpriteRenderer(string objectName, Vector3 localPosition, int sortingOrder)
+    {
+        GameObject visualObject = new GameObject(objectName);
+        visualObject.transform.SetParent(transform, false);
+        visualObject.transform.localPosition = localPosition;
+        visualObject.transform.localScale = flowerVisualScale;
+
+        SpriteRenderer renderer = visualObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = budSprite;
+        renderer.color = Color.white;
+        renderer.sortingOrder = sortingOrder;
+        return renderer;
+    }
+
     private void EnsureCollider()
     {
         interactionCollider = GetComponent<BoxCollider2D>();
         interactionCollider.isTrigger = true;
         interactionCollider.size = new Vector2(
-            Mathf.Max(previewFlowerSize.x, branchBodySize.x, colorMarkerRadius * 2f),
-            branchBodySize.y + colorMarkerRadius * 2f + previewFlowerSize.y);
-        interactionCollider.offset = new Vector2(0f, 0.15f);
+            Mathf.Max(previewFlowerSize.x, branchBodySize.x, flowerVisualScale.x),
+            branchBodySize.y + previewFlowerSize.y + 1.2f);
+        interactionCollider.offset = new Vector2(0f, 0.2f);
     }
 
     private void EnsureHoverController()
