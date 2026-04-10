@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider2D))]
@@ -12,15 +13,26 @@ public class BranchController : MonoBehaviour
     [SerializeField] private Vector3 growthBarLocalPosition = new Vector3(0f, -1.1f, 0f);
     [SerializeField] private Vector2 growthBarSize = new Vector2(0.9f, 0.12f);
 
-    private GameObject bodyVisual;
     private Sprite budSprite;
     private Sprite grownSprite;
+    private Sprite initialBranchSprite;
+    private Sprite cutSourceBranchSprite;
+    private Sprite graftPreviewBranchSprite;
+    private Sprite graftBandagedBranchSprite;
+    private Sprite matureBranchSprite;
+    private Sprite scionDragSprite;
+    private Vector3 branchSpriteScale = Vector3.one;
     private Vector3 flowerVisualScale = Vector3.one;
+    private Vector3 scionDragScale = Vector3.one;
+    private float sourceRecoveryDurationSeconds = 3.5f;
+    private bool isGraftPreviewActive;
+    private Coroutine sourceRecoveryRoutine;
+
+    private SpriteRenderer branchSpriteRenderer;
     private SpriteRenderer colorMarkerRenderer;
     private SpriteRenderer previewFlowerRenderer;
     private SpriteRenderer matureFlowerRenderer;
     private GameObject growthBarRoot;
-    private GameObject growthBarBackground;
     private GameObject growthBarFill;
     private BoxCollider2D interactionCollider;
     private GrowthSystem growthSystem;
@@ -29,6 +41,8 @@ public class BranchController : MonoBehaviour
     public FlowerColor CurrentColor => Data.CurrentColor;
     public bool IsPreviewVisible => previewFlowerRenderer != null && previewFlowerRenderer.gameObject.activeSelf;
     public int DamageLevel => Data.DamageLevel;
+    public Sprite ScionDragSprite => scionDragSprite;
+    public Vector3 ScionDragScale => scionDragScale;
 
     public void Initialize(BranchData data, BranchVisualSettings visualSettings)
     {
@@ -36,9 +50,18 @@ public class BranchController : MonoBehaviour
         branchBodySize = visualSettings.BranchBodySize;
         previewFlowerSize = visualSettings.PreviewFlowerSize;
         previewLocalPosition = visualSettings.PreviewLocalPosition;
+        branchSpriteScale = visualSettings.BranchSpriteScale == Vector3.zero ? Vector3.one : visualSettings.BranchSpriteScale;
         budSprite = visualSettings.BudSprite;
         grownSprite = visualSettings.GrownSprite;
+        initialBranchSprite = visualSettings.InitialBranchSprite;
+        cutSourceBranchSprite = visualSettings.CutSourceBranchSprite;
+        graftPreviewBranchSprite = visualSettings.GraftPreviewBranchSprite;
+        graftBandagedBranchSprite = visualSettings.GraftBandagedBranchSprite;
+        matureBranchSprite = visualSettings.MatureBranchSprite;
+        scionDragSprite = visualSettings.ScionDragSprite;
         flowerVisualScale = visualSettings.FlowerVisualScale == Vector3.zero ? Vector3.one : visualSettings.FlowerVisualScale;
+        scionDragScale = visualSettings.ScionDragScale == Vector3.zero ? Vector3.one : visualSettings.ScionDragScale;
+        sourceRecoveryDurationSeconds = Mathf.Max(0.1f, visualSettings.SourceRecoveryDurationSeconds);
 
         gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}";
         EnsureVisuals();
@@ -48,7 +71,7 @@ public class BranchController : MonoBehaviour
 
     public void ShowPreview()
     {
-        if (Data.State != BranchState.Idle)
+        if (Data.State != BranchState.Idle || isGraftPreviewActive || previewFlowerRenderer == null)
         {
             return;
         }
@@ -89,6 +112,7 @@ public class BranchController : MonoBehaviour
 
         GameManager.Instance.Inventory.AddFlower(new FlowerData(Data.CurrentColor));
         Data.SetState(BranchState.Idle);
+        isGraftPreviewActive = false;
         RefreshVisuals();
         return true;
     }
@@ -118,10 +142,69 @@ public class BranchController : MonoBehaviour
             && previewFlowerRenderer.bounds.Contains(worldPoint);
     }
 
-    public void SetGrowing(FlowerColor flowerColor)
+    public bool CanStartScionDrag()
+    {
+        return Data != null && Data.State == BranchState.Idle;
+    }
+
+    public bool CanReceiveGraft()
+    {
+        return Data != null && Data.State == BranchState.Idle;
+    }
+
+    public void BeginSourceRecovery()
+    {
+        if (!CanStartScionDrag())
+        {
+            return;
+        }
+
+        HidePreview();
+        Data.SetState(BranchState.SourceRecovering);
+        isGraftPreviewActive = false;
+        RefreshVisuals();
+
+        if (sourceRecoveryRoutine != null)
+        {
+            StopCoroutine(sourceRecoveryRoutine);
+        }
+
+        sourceRecoveryRoutine = StartCoroutine(RecoverSourceBranchRoutine());
+    }
+
+    public void SetGraftPreviewActive(bool isActive)
+    {
+        bool nextState = isActive && CanReceiveGraft();
+        if (isGraftPreviewActive == nextState)
+        {
+            return;
+        }
+
+        isGraftPreviewActive = nextState;
+        if (isGraftPreviewActive)
+        {
+            HidePreview();
+        }
+
+        RefreshVisuals();
+    }
+
+    public bool TryBeginGraftedGrowth(FlowerColor fusedColor)
+    {
+        if (!CanReceiveGraft() || growthSystem == null)
+        {
+            return false;
+        }
+
+        HidePreview();
+        isGraftPreviewActive = false;
+        return growthSystem.TryStartGrowth(fusedColor, BranchState.GraftGrowing);
+    }
+
+    public void SetGrowthState(FlowerColor flowerColor, BranchState growthState)
     {
         Data.SetCurrentColor(flowerColor);
-        Data.SetState(BranchState.Growing);
+        Data.SetState(growthState);
         RefreshVisuals();
     }
 
@@ -129,6 +212,7 @@ public class BranchController : MonoBehaviour
     {
         Data.SetCurrentColor(flowerColor);
         Data.SetState(BranchState.Mature);
+        isGraftPreviewActive = false;
         RefreshVisuals();
     }
 
@@ -163,37 +247,37 @@ public class BranchController : MonoBehaviour
         gameObject.name = $"Branch_{Data.Index:00}_{Data.InitialColor}_Dmg{Data.DamageLevel}";
         Color branchColor = FlowerColorPalette.ToUnityColor(Data.CurrentColor);
 
+        if (branchSpriteRenderer != null)
+        {
+            branchSpriteRenderer.sprite = ResolveBranchSprite();
+            branchSpriteRenderer.color = Color.white;
+        }
+
         if (colorMarkerRenderer != null)
         {
             colorMarkerRenderer.sprite = budSprite;
             colorMarkerRenderer.color = branchColor;
+            colorMarkerRenderer.gameObject.SetActive(ShouldShowBud());
         }
 
         if (previewFlowerRenderer != null)
         {
             previewFlowerRenderer.sprite = grownSprite;
             previewFlowerRenderer.color = branchColor;
+            if (Data.State != BranchState.Idle || isGraftPreviewActive)
+            {
+                previewFlowerRenderer.gameObject.SetActive(false);
+            }
         }
 
         if (matureFlowerRenderer != null)
         {
             matureFlowerRenderer.sprite = grownSprite;
             matureFlowerRenderer.color = branchColor;
+            matureFlowerRenderer.gameObject.SetActive(Data.State == BranchState.Mature);
         }
 
-        bool mature = Data.State == BranchState.Mature;
-        if (colorMarkerRenderer != null)
-        {
-            colorMarkerRenderer.gameObject.SetActive(!mature);
-        }
-
-        if (matureFlowerRenderer != null)
-        {
-            matureFlowerRenderer.gameObject.SetActive(mature);
-        }
-
-        HidePreview();
-        if (Data.State != BranchState.Growing)
+        if (Data.State != BranchState.Growing && Data.State != BranchState.GraftGrowing)
         {
             SetGrowthProgressVisible(false);
         }
@@ -228,26 +312,25 @@ public class BranchController : MonoBehaviour
 
     private void EnsureVisuals()
     {
-        if (bodyVisual == null)
+        if (branchSpriteRenderer == null)
         {
-            bodyVisual = SimpleShapeFactory.CreateRectangle("BranchBody", transform, branchBodySize, GameConstants.BranchBodyColor, 0);
-            bodyVisual.transform.localPosition = bodyLocalPosition;
+            branchSpriteRenderer = CreateSpriteRenderer("BranchBodySprite", bodyLocalPosition, branchSpriteScale, 0);
         }
 
         if (colorMarkerRenderer == null)
         {
-            colorMarkerRenderer = CreateFlowerSpriteRenderer("BudVisual", markerLocalPosition, 1);
+            colorMarkerRenderer = CreateSpriteRenderer("BudVisual", markerLocalPosition, flowerVisualScale, 1);
         }
 
         if (previewFlowerRenderer == null)
         {
-            previewFlowerRenderer = CreateFlowerSpriteRenderer("PreviewFlower", previewLocalPosition, 2);
+            previewFlowerRenderer = CreateSpriteRenderer("PreviewFlower", previewLocalPosition, flowerVisualScale, 2);
             previewFlowerRenderer.gameObject.SetActive(false);
         }
 
         if (matureFlowerRenderer == null)
         {
-            matureFlowerRenderer = CreateFlowerSpriteRenderer("MatureFlower", markerLocalPosition, 2);
+            matureFlowerRenderer = CreateSpriteRenderer("MatureFlower", markerLocalPosition, flowerVisualScale, 2);
             matureFlowerRenderer.gameObject.SetActive(false);
         }
 
@@ -257,7 +340,7 @@ public class BranchController : MonoBehaviour
             growthBarRoot.transform.SetParent(transform, false);
             growthBarRoot.transform.localPosition = growthBarLocalPosition;
 
-            growthBarBackground = SimpleShapeFactory.CreateRectangle("GrowthBarBackground", growthBarRoot.transform, growthBarSize, new Color(0.14f, 0.14f, 0.16f, 0.95f), 2);
+            SimpleShapeFactory.CreateRectangle("GrowthBarBackground", growthBarRoot.transform, growthBarSize, new Color(0.14f, 0.14f, 0.16f, 0.95f), 2);
             growthBarFill = SimpleShapeFactory.CreateRectangle("GrowthBarFill", growthBarRoot.transform, new Vector2(growthBarSize.x - 0.06f, growthBarSize.y - 0.04f), new Color(0.38f, 0.9f, 0.42f, 1f), 3);
             SetGrowthProgressVisible(false);
         }
@@ -268,15 +351,14 @@ public class BranchController : MonoBehaviour
         EnsureGrowthSystem();
     }
 
-    private SpriteRenderer CreateFlowerSpriteRenderer(string objectName, Vector3 localPosition, int sortingOrder)
+    private SpriteRenderer CreateSpriteRenderer(string objectName, Vector3 localPosition, Vector3 localScale, int sortingOrder)
     {
         GameObject visualObject = new GameObject(objectName);
         visualObject.transform.SetParent(transform, false);
         visualObject.transform.localPosition = localPosition;
-        visualObject.transform.localScale = flowerVisualScale;
+        visualObject.transform.localScale = localScale;
 
         SpriteRenderer renderer = visualObject.AddComponent<SpriteRenderer>();
-        renderer.sprite = budSprite;
         renderer.color = Color.white;
         renderer.sortingOrder = sortingOrder;
         return renderer;
@@ -287,9 +369,9 @@ public class BranchController : MonoBehaviour
         interactionCollider = GetComponent<BoxCollider2D>();
         interactionCollider.isTrigger = true;
         interactionCollider.size = new Vector2(
-            Mathf.Max(previewFlowerSize.x, branchBodySize.x, flowerVisualScale.x),
-            branchBodySize.y + previewFlowerSize.y + 1.2f);
-        interactionCollider.offset = new Vector2(0f, 0.2f);
+            Mathf.Max(previewFlowerSize.x, branchBodySize.x * Mathf.Max(1f, branchSpriteScale.x * 2f), flowerVisualScale.x),
+            branchBodySize.y * Mathf.Max(1.25f, branchSpriteScale.y) + previewFlowerSize.y + 1.1f);
+        interactionCollider.offset = new Vector2(0f, 0.15f);
     }
 
     private void EnsureHoverController()
@@ -346,21 +428,54 @@ public class BranchController : MonoBehaviour
         ApplyChargeHarvestResult(result);
     }
 
-    private static bool IsPointInTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
+    private IEnumerator RecoverSourceBranchRoutine()
     {
-        float area = GetTriangleSign(a, b, c);
-        float area1 = GetTriangleSign(point, b, c);
-        float area2 = GetTriangleSign(a, point, c);
-        float area3 = GetTriangleSign(a, b, point);
+        yield return new WaitForSeconds(sourceRecoveryDurationSeconds);
 
-        bool hasNegative = area1 < 0f || area2 < 0f || area3 < 0f;
-        bool hasPositive = area1 > 0f || area2 > 0f || area3 > 0f;
-        return Mathf.Approximately(area, 0f) == false && !(hasNegative && hasPositive);
+        if (Data != null && Data.State == BranchState.SourceRecovering)
+        {
+            Data.SetState(BranchState.Idle);
+            RefreshVisuals();
+        }
+
+        sourceRecoveryRoutine = null;
     }
 
-    private static float GetTriangleSign(Vector2 a, Vector2 b, Vector2 c)
+    private Sprite ResolveBranchSprite()
     {
-        return (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y);
+        if (Data == null)
+        {
+            return initialBranchSprite;
+        }
+
+        switch (Data.State)
+        {
+            case BranchState.SourceRecovering:
+                return cutSourceBranchSprite != null ? cutSourceBranchSprite : initialBranchSprite;
+            case BranchState.GraftGrowing:
+                return graftBandagedBranchSprite != null ? graftBandagedBranchSprite : initialBranchSprite;
+            case BranchState.Mature:
+                return matureBranchSprite != null ? matureBranchSprite : initialBranchSprite;
+            default:
+                if (isGraftPreviewActive && graftPreviewBranchSprite != null)
+                {
+                    return graftPreviewBranchSprite;
+                }
+
+                return initialBranchSprite;
+        }
+    }
+
+    private bool ShouldShowBud()
+    {
+        if (Data == null)
+        {
+            return false;
+        }
+
+        return Data.State != BranchState.Mature
+            && Data.State != BranchState.SourceRecovering
+            && !isGraftPreviewActive;
     }
 
     private void SetGrowthProgressVisible(bool isVisible)

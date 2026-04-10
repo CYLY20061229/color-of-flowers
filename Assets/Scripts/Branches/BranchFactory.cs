@@ -16,9 +16,18 @@ public class BranchFactory : MonoBehaviour
     [SerializeField] private Vector2 branchBodySize = new Vector2(0.25f, 1f);
     [SerializeField] private Vector2 previewFlowerSize = new Vector2(0.7f, 0.6f);
     [SerializeField] private Vector3 previewLocalPosition = new Vector3(0f, 1.05f, 0f);
+    [SerializeField] private Vector3 branchSpriteScale = new Vector3(0.95f, 1.15f, 1f);
     [SerializeField] private Sprite budSprite;
     [SerializeField] private Sprite grownSprite;
+    [SerializeField] private Sprite initialBranchSprite;
+    [SerializeField] private Sprite cutSourceBranchSprite;
+    [SerializeField] private Sprite graftPreviewBranchSprite;
+    [SerializeField] private Sprite graftBandagedBranchSprite;
+    [SerializeField] private Sprite matureBranchSprite;
+    [SerializeField] private Sprite scionDragSprite;
     [SerializeField] private Vector3 flowerVisualScale = new Vector3(0.6f, 0.6f, 1f);
+    [SerializeField] private Vector3 scionDragScale = new Vector3(0.6f, 0.6f, 1f);
+    [SerializeField] private float sourceRecoveryDurationSeconds = 3.5f;
 
     private readonly List<BranchController> spawnedBranches = new List<BranchController>();
 
@@ -72,9 +81,18 @@ public class BranchFactory : MonoBehaviour
             BranchBodySize = branchBodySize,
             PreviewFlowerSize = previewFlowerSize,
             PreviewLocalPosition = previewLocalPosition,
+            BranchSpriteScale = branchSpriteScale,
             BudSprite = budSprite,
             GrownSprite = grownSprite,
-            FlowerVisualScale = flowerVisualScale
+            InitialBranchSprite = initialBranchSprite,
+            CutSourceBranchSprite = cutSourceBranchSprite,
+            GraftPreviewBranchSprite = graftPreviewBranchSprite,
+            GraftBandagedBranchSprite = graftBandagedBranchSprite,
+            MatureBranchSprite = matureBranchSprite,
+            ScionDragSprite = scionDragSprite,
+            FlowerVisualScale = flowerVisualScale,
+            ScionDragScale = scionDragScale,
+            SourceRecoveryDurationSeconds = sourceRecoveryDurationSeconds
         };
     }
 
@@ -104,6 +122,36 @@ public class BranchFactory : MonoBehaviour
         if (grownSprite == null)
         {
             grownSprite = LoadSpriteResource("Flowers/grown");
+        }
+
+        if (initialBranchSprite == null)
+        {
+            initialBranchSprite = LoadSpriteResource("Branches/branch_original");
+        }
+
+        if (cutSourceBranchSprite == null)
+        {
+            cutSourceBranchSprite = LoadSpriteResource("Branches/branch_cut");
+        }
+
+        if (graftPreviewBranchSprite == null)
+        {
+            graftPreviewBranchSprite = LoadSpriteResource("Branches/branch_crack");
+        }
+
+        if (graftBandagedBranchSprite == null)
+        {
+            graftBandagedBranchSprite = LoadSpriteResource("Branches/branch_recover");
+        }
+
+        if (matureBranchSprite == null)
+        {
+            matureBranchSprite = LoadSpriteResource("Branches/branch_mature");
+        }
+
+        if (scionDragSprite == null)
+        {
+            scionDragSprite = LoadSpriteResource("Branches/cut");
         }
     }
 

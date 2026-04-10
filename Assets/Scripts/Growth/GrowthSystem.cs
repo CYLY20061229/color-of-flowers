@@ -17,21 +17,26 @@ public class GrowthSystem : MonoBehaviour
 
     public bool TryStartGrowth(FlowerColor flowerColor)
     {
+        return TryStartGrowth(flowerColor, BranchState.Growing);
+    }
+
+    public bool TryStartGrowth(FlowerColor flowerColor, BranchState growthState)
+    {
         if (branch == null || branch.Data.State != BranchState.Idle || growthRoutine != null)
         {
             return false;
         }
 
-        growthRoutine = StartCoroutine(Grow(flowerColor));
+        growthRoutine = StartCoroutine(Grow(flowerColor, growthState));
         return true;
     }
 
-    private IEnumerator Grow(FlowerColor flowerColor)
+    private IEnumerator Grow(FlowerColor flowerColor, BranchState growthState)
     {
         float totalDurationSeconds = GetGrowthDurationSeconds();
         float elapsedSeconds = 0f;
 
-        branch.SetGrowing(flowerColor);
+        branch.SetGrowthState(flowerColor, growthState);
         branch.BeginGrowthProgress(totalDurationSeconds);
 
         while (elapsedSeconds < totalDurationSeconds)

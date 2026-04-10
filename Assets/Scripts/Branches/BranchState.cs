@@ -2,5 +2,7 @@ public enum BranchState
 {
     Idle,
     Growing,
-    Mature
+    GraftGrowing,
+    Mature,
+    SourceRecovering
 }

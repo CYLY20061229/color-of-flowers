@@ -6,11 +6,12 @@ public class DragDropController : MonoBehaviour
 
     private BranchController branch;
     private Camera mainCamera;
-    private Vector3 originalWorldPosition;
     private Vector3 pointerDownWorldPosition;
-    private Vector3 dragOffset;
     private bool isPointerDown;
     private bool isDragging;
+    private GameObject scionDragGhost;
+    private SpriteRenderer scionDragRenderer;
+    private BranchController currentPreviewTarget;
 
     public void Initialize(BranchController branchController)
     {
@@ -39,9 +40,7 @@ public class DragDropController : MonoBehaviour
             mainCamera = Camera.main;
         }
 
-        originalWorldPosition = transform.position;
         pointerDownWorldPosition = GetMouseWorldPosition();
-        dragOffset = transform.position - pointerDownWorldPosition;
         isPointerDown = true;
         isDragging = false;
     }
@@ -58,11 +57,16 @@ public class DragDropController : MonoBehaviour
         {
             isDragging = true;
             branch.HidePreview();
+            branch.BeginSourceRecovery();
+            EnsureScionGhost();
+            UpdateScionGhostPosition(mouseWorldPosition);
+            scionDragGhost.SetActive(true);
         }
 
         if (isDragging)
         {
-            transform.position = mouseWorldPosition + dragOffset;
+            UpdateScionGhostPosition(mouseWorldPosition);
+            UpdatePreviewTarget();
         }
     }
 
@@ -81,8 +85,6 @@ public class DragDropController : MonoBehaviour
             {
                 ApplyFusionToTarget(targetBranch);
             }
-
-            transform.position = originalWorldPosition;
         }
         else if (branch.IsWorldPointInsidePreviewFlower(mouseWorldPosition))
         {
@@ -93,13 +95,19 @@ public class DragDropController : MonoBehaviour
             branch.TryStartChargeHarvestFromMatureFlower();
         }
 
+        ClearPreviewTarget();
+        HideScionGhost();
         isPointerDown = false;
         isDragging = false;
     }
 
     private bool CanInteract()
     {
-        return branch != null && branch.Data != null && branch.Data.State != BranchState.Growing;
+        return branch != null
+            && branch.Data != null
+            && branch.Data.State != BranchState.Growing
+            && branch.Data.State != BranchState.GraftGrowing
+            && branch.Data.State != BranchState.SourceRecovering;
     }
 
     private bool CanStartBranchDrag()
@@ -129,7 +137,7 @@ public class DragDropController : MonoBehaviour
         foreach (Collider2D hit in hits)
         {
             BranchController hitBranch = hit.GetComponent<BranchController>();
-            if (hitBranch != null && hitBranch != branch && hitBranch.Data.State == BranchState.Idle)
+            if (hitBranch != null && hitBranch != branch && hitBranch.CanReceiveGraft())
             {
                 return hitBranch;
             }
@@ -141,6 +149,69 @@ public class DragDropController : MonoBehaviour
     private void ApplyFusionToTarget(BranchController targetBranch)
     {
         FlowerColor fusedColor = ColorFusionSystem.Fuse(branch.CurrentColor, targetBranch.CurrentColor);
-        targetBranch.SetCurrentColor(fusedColor);
+        targetBranch.TryBeginGraftedGrowth(fusedColor);
+    }
+
+    private void UpdatePreviewTarget()
+    {
+        BranchController targetBranch = FindTargetBranchUnderMouse();
+        if (targetBranch == currentPreviewTarget)
+        {
+            return;
+        }
+
+        if (currentPreviewTarget != null)
+        {
+            currentPreviewTarget.SetGraftPreviewActive(false);
+        }
+
+        currentPreviewTarget = targetBranch;
+        if (currentPreviewTarget != null)
+        {
+            currentPreviewTarget.SetGraftPreviewActive(true);
+        }
+    }
+
+    private void ClearPreviewTarget()
+    {
+        if (currentPreviewTarget != null)
+        {
+            currentPreviewTarget.SetGraftPreviewActive(false);
+            currentPreviewTarget = null;
+        }
+    }
+
+    private void EnsureScionGhost()
+    {
+        if (scionDragGhost != null)
+        {
+            return;
+        }
+
+        scionDragGhost = new GameObject($"ScionDragGhost_{name}");
+        scionDragRenderer = scionDragGhost.AddComponent<SpriteRenderer>();
+        scionDragRenderer.sortingOrder = 40;
+        scionDragRenderer.color = Color.white;
+        scionDragGhost.SetActive(false);
+    }
+
+    private void UpdateScionGhostPosition(Vector3 worldPosition)
+    {
+        if (scionDragGhost == null)
+        {
+            return;
+        }
+
+        scionDragRenderer.sprite = branch != null ? branch.ScionDragSprite : null;
+        scionDragGhost.transform.position = new Vector3(worldPosition.x, worldPosition.y, 0f);
+        scionDragGhost.transform.localScale = branch != null ? branch.ScionDragScale : Vector3.one;
+    }
+
+    private void HideScionGhost()
+    {
+        if (scionDragGhost != null)
+        {
+            scionDragGhost.SetActive(false);
+        }
     }
 }
