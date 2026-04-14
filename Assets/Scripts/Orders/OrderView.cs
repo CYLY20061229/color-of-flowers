@@ -1,11 +1,11 @@
-using System.Text;
+﻿using System.Text;
 using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider2D))]
 public class OrderView : MonoBehaviour
 {
-    private const float PanelWidth = 2.8f;
-    private const float PanelHeight = 1.35f;
+    private const float PanelWidth = 2.2f;
+    private const float PanelHeight = 0.9f;
 
     private OrderSystem orderSystem;
     private OrderData orderData;
@@ -63,12 +63,12 @@ public class OrderView : MonoBehaviour
 
         GameObject labelObject = new GameObject("OrderLabel");
         labelObject.transform.SetParent(transform, false);
-        labelObject.transform.localPosition = new Vector3(-1.2f, 0.46f, -0.01f);
+        labelObject.transform.localPosition = new Vector3(-0.95f, 0.34f, -0.01f);
 
         label = labelObject.AddComponent<TextMesh>();
         label.anchor = TextAnchor.UpperLeft;
         label.alignment = TextAlignment.Left;
-        label.characterSize = 0.078f;
+        label.characterSize = 0.052f;
         label.fontSize = 48;
         label.color = Color.white;
 
@@ -90,14 +90,14 @@ public class OrderView : MonoBehaviour
 
         if (orderData == null)
         {
-            label.text = "Customer Order\n\nNo orders";
+            label.text = "顾客订单\n\n暂无订单";
             SetPanelColor(false);
             return;
         }
 
         if (orderData.IsCompleted)
         {
-            label.text = "Order Complete\n\nThanks!";
+            label.text = $"{orderData.CustomerName}\n已完成";
             SetPanelColor(true);
             return;
         }
@@ -105,18 +105,22 @@ public class OrderView : MonoBehaviour
         bool selected = orderSystem.SelectedOrder == orderData;
 
         StringBuilder builder = new StringBuilder();
-        builder.AppendLine(selected ? $"Customer #{orderData.Id} Selected" : $"Customer #{orderData.Id}");
-        builder.AppendLine(orderData.HasBouquetOrder ? "Bouquet Order" : "Click to submit");
-        builder.AppendLine();
-
-        for (int i = 0; i < orderData.Requirements.Count; i++)
-        {
-            OrderRequirement requirement = orderData.Requirements[i];
-            builder.AppendLine($"{FlowerColorPalette.GetDisplayName(requirement.Color)} x{requirement.RequiredCount}");
-        }
+        builder.AppendLine(selected ? $"{orderData.CustomerName} 进行中" : orderData.CustomerName);
+        builder.AppendLine(TrimSummary(orderData.ChatSummary, 24));
+        builder.Append(orderData.HasBouquetOrder ? "点击查看" : "点击提交");
 
         label.text = builder.ToString();
         SetPanelColor(selected);
+    }
+
+    private static string TrimSummary(string summary, int maxLength)
+    {
+        if (string.IsNullOrEmpty(summary) || summary.Length <= maxLength)
+        {
+            return summary;
+        }
+
+        return summary.Substring(0, maxLength - 3) + "...";
     }
 
     private void SetPanelColor(bool selected)

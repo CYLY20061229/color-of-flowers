@@ -8,8 +8,8 @@ public class BranchController : MonoBehaviour
     [SerializeField] private Vector2 branchBodySize = new Vector2(0.25f, 1f);
     [SerializeField] private Vector2 previewFlowerSize = new Vector2(0.7f, 0.6f);
     [SerializeField] private Vector3 bodyLocalPosition = new Vector3(0f, -0.35f, 0f);
-    [SerializeField] private Vector3 markerLocalPosition = new Vector3(0f, 0.35f, 0f);
-    [SerializeField] private Vector3 previewLocalPosition = new Vector3(0f, 1.05f, 0f);
+    [SerializeField] private Vector3 markerLocalPosition = new Vector3(0f, 0.8f, 0f);
+    [SerializeField] private Vector3 previewLocalPosition = new Vector3(0f, 1.46f, 0f);
     [SerializeField] private Vector3 growthBarLocalPosition = new Vector3(0f, -1.1f, 0f);
     [SerializeField] private Vector2 growthBarSize = new Vector2(0.9f, 0.12f);
 
@@ -110,7 +110,17 @@ public class BranchController : MonoBehaviour
             return false;
         }
 
-        GameManager.Instance.Inventory.AddFlower(new FlowerData(Data.CurrentColor));
+        Vector3 harvestStartPosition = GetHarvestFlyStartPosition();
+        if (!GameManager.Instance.Inventory.TryAddFlower(new FlowerData(Data.CurrentColor)))
+        {
+            return false;
+        }
+
+        if (GameManager.Instance.HarvestFlyToBasket != null)
+        {
+            GameManager.Instance.HarvestFlyToBasket.PlayFly(Data.CurrentColor, harvestStartPosition);
+        }
+
         Data.SetState(BranchState.Idle);
         isGraftPreviewActive = false;
         RefreshVisuals();
@@ -121,6 +131,16 @@ public class BranchController : MonoBehaviour
     {
         if (Data.State != BranchState.Mature || GameManager.Instance == null || GameManager.Instance.ChargeHarvest == null)
         {
+            return false;
+        }
+
+        if (GameManager.Instance.Inventory != null && !GameManager.Instance.Inventory.CanAddFlower())
+        {
+            if (GameManager.Instance.BasketDisplay != null)
+            {
+                GameManager.Instance.BasketDisplay.ShowStatusMessage("花篮已满");
+            }
+
             return false;
         }
 
@@ -426,6 +446,21 @@ public class BranchController : MonoBehaviour
         }
 
         ApplyChargeHarvestResult(result);
+    }
+
+    private Vector3 GetHarvestFlyStartPosition()
+    {
+        if (matureFlowerRenderer != null && matureFlowerRenderer.gameObject.activeSelf)
+        {
+            return matureFlowerRenderer.bounds.center;
+        }
+
+        if (colorMarkerRenderer != null)
+        {
+            return colorMarkerRenderer.bounds.center;
+        }
+
+        return transform.position;
     }
 
     private IEnumerator RecoverSourceBranchRoutine()

@@ -69,7 +69,7 @@ public class SlotFlowerReturnDragHandler : MonoBehaviour
 
         for (int i = 0; i < hits.Length; i++)
         {
-            if (hits[i].GetComponent<InventoryView>() != null)
+            if (hits[i].GetComponent<BasketDisplay>() != null || hits[i].GetComponent<InventoryView>() != null)
             {
                 return true;
             }

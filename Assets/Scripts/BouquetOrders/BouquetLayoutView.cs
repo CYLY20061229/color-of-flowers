@@ -4,13 +4,16 @@ using UnityEngine;
 public class BouquetLayoutView : MonoBehaviour
 {
     private const float PanelWidth = 2.8f;
-    private const float PanelHeight = 2.35f;
+    private const float PanelHeight = 2.6f;
+    private const string BouquetBaseSpriteResourcePath = "Bouquets/bouquet";
 
     private BouquetOrderManager bouquetOrderManager;
     private TextMesh titleText;
     private TextMesh hintText;
     private Transform slotRoot;
     private readonly List<BouquetSlotView> slotViews = new List<BouquetSlotView>();
+    private SpriteRenderer bouquetBaseRenderer;
+    private Sprite bouquetBaseSprite;
 
     public void Initialize(BouquetOrderManager manager)
     {
@@ -41,14 +44,14 @@ public class BouquetLayoutView : MonoBehaviour
             return;
         }
 
-        SimpleShapeFactory.CreateRectangle("BouquetOrderPanel", transform, new Vector2(PanelWidth, PanelHeight), new Color(0.08f, 0.1f, 0.13f, 0.9f), 20);
+        EnsureBouquetBase();
 
-        titleText = CreateText("TitleText", new Vector3(0f, 0.92f, -0.01f), 0.085f);
-        hintText = CreateText("HintText", new Vector3(0f, -0.92f, -0.01f), 0.065f);
+        titleText = CreateText("TitleText", new Vector3(0f, 0.9f, -0.01f), 0.07f);
+        hintText = CreateText("HintText", new Vector3(0f, -0.96f, -0.01f), 0.05f);
 
         GameObject slotRootObject = new GameObject("SlotRoot");
         slotRootObject.transform.SetParent(transform, false);
-        slotRootObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
+        slotRootObject.transform.localPosition = new Vector3(0f, 0.42f, -0.01f);
         slotRoot = slotRootObject.transform;
     }
 
@@ -70,14 +73,35 @@ public class BouquetLayoutView : MonoBehaviour
         return textMesh;
     }
 
+    private void EnsureBouquetBase()
+    {
+        if (bouquetBaseRenderer == null)
+        {
+            GameObject bouquetBaseObject = new GameObject("BouquetBase");
+            bouquetBaseObject.transform.SetParent(transform, false);
+            bouquetBaseObject.transform.localPosition = new Vector3(0f, -0.14f, -0.005f);
+            bouquetBaseRenderer = bouquetBaseObject.AddComponent<SpriteRenderer>();
+        }
+
+        if (bouquetBaseSprite == null)
+        {
+            bouquetBaseSprite = LoadBouquetBaseSprite();
+        }
+
+        bouquetBaseRenderer.sprite = bouquetBaseSprite;
+        bouquetBaseRenderer.sortingOrder = 21;
+        bouquetBaseRenderer.color = new Color(1f, 1f, 1f, 0.92f);
+        bouquetBaseRenderer.transform.localScale = new Vector3(1.08f, 1.08f, 1f);
+    }
+
     private void Refresh()
     {
         ClearSlots();
 
         if (bouquetOrderManager == null || bouquetOrderManager.ActiveOrder == null)
         {
-            titleText.text = "Bouquet Layout";
-            hintText.text = bouquetOrderManager != null ? bouquetOrderManager.FeedbackMessage : "Select a bouquet customer";
+            titleText.text = "花束摆放";
+            hintText.text = bouquetOrderManager != null ? bouquetOrderManager.FeedbackMessage : "请先选择订单";
             return;
         }
 
@@ -109,5 +133,26 @@ public class BouquetLayoutView : MonoBehaviour
         }
 
         slotViews.Clear();
+    }
+
+    private Sprite LoadBouquetBaseSprite()
+    {
+        Sprite sprite = Resources.Load<Sprite>(BouquetBaseSpriteResourcePath);
+        if (sprite != null)
+        {
+            return sprite;
+        }
+
+        Texture2D texture = Resources.Load<Texture2D>(BouquetBaseSpriteResourcePath);
+        if (texture == null)
+        {
+            return null;
+        }
+
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            512f);
     }
 }

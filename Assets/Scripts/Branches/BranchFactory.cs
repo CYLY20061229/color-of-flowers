@@ -8,9 +8,9 @@ public class BranchFactory : MonoBehaviour
 
     [Header("Layout")]
     [SerializeField] private int columnsPerColor = GameConstants.BranchesPerBaseColor;
-    [SerializeField] private float horizontalSpacing = 1.25f;
-    [SerializeField] private float verticalSpacing = 1.75f;
-    [SerializeField] private Vector3 startPosition = new Vector3(-3.15f, 1.75f, 0f);
+    [SerializeField] private float groupSpacing = 3.05f;
+    [SerializeField] private float intraGroupSpacing = 0.92f;
+    [SerializeField] private Vector3 startPosition = new Vector3(-3.6f, 0.9f, 0f);
 
     [Header("Branch Visuals")]
     [SerializeField] private Vector2 branchBodySize = new Vector2(0.25f, 1f);
@@ -35,7 +35,29 @@ public class BranchFactory : MonoBehaviour
 
     private void Start()
     {
+        ApplyPrototypeDefaults();
         SpawnInitialBranches();
+    }
+
+    public void ResetBranches()
+    {
+        ClearBranches();
+        SpawnInitialBranches();
+    }
+
+    public void ClearBranches()
+    {
+        spawnedBranches.Clear();
+
+        if (branchRoot == null)
+        {
+            return;
+        }
+
+        for (int childIndex = branchRoot.childCount - 1; childIndex >= 0; childIndex--)
+        {
+            Destroy(branchRoot.GetChild(childIndex).gameObject);
+        }
     }
 
     public void SpawnInitialBranches()
@@ -51,15 +73,63 @@ public class BranchFactory : MonoBehaviour
         FlowerColor[] baseColors = { FlowerColor.Red, FlowerColor.Green, FlowerColor.Blue };
         int branchIndex = 0;
 
-        for (int row = 0; row < baseColors.Length; row++)
+        for (int groupIndex = 0; groupIndex < baseColors.Length; groupIndex++)
         {
             for (int column = 0; column < columnsPerColor; column++)
             {
-                Vector3 position = startPosition + new Vector3(column * horizontalSpacing, -row * verticalSpacing, 0f);
-                BranchController branch = CreateBranch(branchIndex, baseColors[row], position);
+                Vector3 position = GetBranchPosition(groupIndex, column);
+                BranchController branch = CreateBranch(branchIndex, baseColors[groupIndex], position);
                 spawnedBranches.Add(branch);
                 branchIndex++;
             }
+        }
+    }
+
+    private void ApplyPrototypeDefaults()
+    {
+        columnsPerColor = GameConstants.BranchesPerBaseColor;
+        groupSpacing = 2.12f;
+        intraGroupSpacing = 0.58f;
+        startPosition = new Vector3(-2.5f, 1.1f, 0f);
+
+        branchSpriteScale = new Vector3(0.5f, 0.62f, 1f);
+        flowerVisualScale = new Vector3(0.34f, 0.34f, 1f);
+        scionDragScale = new Vector3(0.3f, 0.3f, 1f);
+
+        branchBodySize = new Vector2(0.14f, 0.56f);
+        previewFlowerSize = new Vector2(0.38f, 0.36f);
+    }
+
+    private Vector3 GetBranchPosition(int groupIndex, int columnIndex)
+    {
+        float x = startPosition.x + groupIndex * groupSpacing + columnIndex * intraGroupSpacing;
+        float y = startPosition.y + GetGroupHeightOffset(groupIndex) + GetWithinGroupHeightOffset(columnIndex);
+        return new Vector3(x, y, startPosition.z);
+    }
+
+    private float GetGroupHeightOffset(int groupIndex)
+    {
+        switch (groupIndex)
+        {
+            case 1:
+                return 0.34f;
+            case 2:
+                return 0.02f;
+            default:
+                return 0f;
+        }
+    }
+
+    private float GetWithinGroupHeightOffset(int columnIndex)
+    {
+        switch (columnIndex)
+        {
+            case 0:
+                return -0.08f;
+            case 2:
+                return 0.08f;
+            default:
+                return 0f;
         }
     }
 
@@ -100,6 +170,11 @@ public class BranchFactory : MonoBehaviour
     {
         if (branchRoot != null)
         {
+            if (GameManager.Instance != null && GameManager.Instance.WorkspaceRoot != null && branchRoot.parent != GameManager.Instance.WorkspaceRoot)
+            {
+                branchRoot.SetParent(GameManager.Instance.WorkspaceRoot, false);
+            }
+
             return;
         }
 
@@ -110,6 +185,11 @@ public class BranchFactory : MonoBehaviour
         }
 
         branchRoot = rootObject.transform;
+
+        if (GameManager.Instance != null && GameManager.Instance.WorkspaceRoot != null)
+        {
+            branchRoot.SetParent(GameManager.Instance.WorkspaceRoot, false);
+        }
     }
 
     private void EnsureFlowerSprites()

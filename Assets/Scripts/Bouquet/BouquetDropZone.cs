@@ -3,8 +3,8 @@ using UnityEngine;
 
 public class BouquetDropZone : MonoBehaviour
 {
-    private const float PanelWidth = 2.8f;
-    private const float PanelHeight = 1.35f;
+    private const float PanelWidth = 2.2f;
+    private const float PanelHeight = 1f;
 
     private BouquetSystem bouquetSystem;
     private OrderSystem orderSystem;
@@ -59,12 +59,12 @@ public class BouquetDropZone : MonoBehaviour
 
         GameObject labelObject = new GameObject("BouquetLabel");
         labelObject.transform.SetParent(transform, false);
-        labelObject.transform.localPosition = new Vector3(-1.2f, 0.45f, -0.01f);
+        labelObject.transform.localPosition = new Vector3(-0.95f, 0.34f, -0.01f);
 
         label = labelObject.AddComponent<TextMesh>();
         label.anchor = TextAnchor.UpperLeft;
         label.alignment = TextAlignment.Left;
-        label.characterSize = 0.078f;
+        label.characterSize = 0.05f;
         label.fontSize = 48;
         label.color = Color.white;
 
@@ -87,18 +87,18 @@ public class BouquetDropZone : MonoBehaviour
         OrderData order = orderSystem.SelectedOrder;
         if (order == null)
         {
-            label.text = "Bouquet\n\nSelect an order";
+            label.text = "花束\n\n请选择订单";
             return;
         }
 
         if (order.IsCompleted)
         {
-            label.text = "Bouquet\n\nOrder complete";
+            label.text = "花束\n\n订单完成";
             return;
         }
 
         StringBuilder builder = new StringBuilder();
-        builder.AppendLine("Bouquet");
+        builder.AppendLine("花束");
 
         for (int i = 0; i < order.Requirements.Count; i++)
         {

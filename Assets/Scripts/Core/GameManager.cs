@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(BranchFactory))]
 public class GameManager : MonoBehaviour
@@ -9,14 +8,23 @@ public class GameManager : MonoBehaviour
 
     public static GameManager Instance { get; private set; }
     public InventorySystem Inventory { get; private set; }
+    public BasketDisplay BasketDisplay { get; private set; }
     public OrderSystem Orders { get; private set; }
     public BouquetSystem Bouquet { get; private set; }
     public BouquetOrderManager BouquetOrders { get; private set; }
     public ChargeHarvestSystem ChargeHarvest { get; private set; }
     public ChargeHarvestConfig ChargeHarvestConfig { get; private set; }
+    public HarvestFlyToBasketSystem HarvestFlyToBasket { get; private set; }
+    public CurrencyGateway Currency { get; private set; }
+    public FlowerSpeciesMapController FlowerSpeciesMap { get; private set; }
+    public Transform WorkspaceRoot { get; private set; }
+    public Transform MapRoot { get; private set; }
 
-    private Transform orderRoot;
-    private readonly List<OrderView> orderViews = new List<OrderView>();
+    private CurrentOrderDetailView currentOrderDetailView;
+    private BouquetSubmitView bouquetSubmitView;
+    private OrderCarouselView orderCarouselView;
+    private OrderMenuButton orderMenuButton;
+    private BranchFactory branchFactory;
 
     private void Awake()
     {
@@ -27,14 +35,19 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
+        branchFactory = GetComponent<BranchFactory>();
         ConfigureCamera();
+        EnsureInterfaceRoots();
         EnsureBackground();
         EnsureInventorySystem();
+        EnsureBasketDisplay();
         EnsureOrderSystem();
         EnsureBouquetSystem();
         EnsureBouquetOrderSystem();
-        EnsureInventorySystem();
         EnsureChargeHarvestSystem();
+        EnsureHarvestFlyToBasketSystem();
+        EnsureCurrencyGateway();
+        EnsureFlowerSpeciesMap();
     }
 
     private void ConfigureCamera()
@@ -55,7 +68,7 @@ public class GameManager : MonoBehaviour
         }
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = 5f;
+        mainCamera.orthographicSize = 6.8f;
         mainCamera.transform.position = new Vector3(0f, 0f, -10f);
     }
 
@@ -80,14 +93,34 @@ public class GameManager : MonoBehaviour
         }
 
         InventoryView inventoryView = FindFirstObjectByType<InventoryView>();
-        if (inventoryView == null)
+        if (inventoryView != null)
         {
-            GameObject inventoryViewObject = new GameObject("InventoryView");
-            inventoryViewObject.transform.position = new Vector3(4.25f, 2.8f, 0f);
-            inventoryView = inventoryViewObject.AddComponent<InventoryView>();
+            inventoryView.gameObject.SetActive(false);
+        }
+    }
+
+    private void EnsureInterfaceRoots()
+    {
+        WorkspaceRoot = EnsureRoot("WorkspaceRoot");
+        MapRoot = EnsureRoot("FlowerSpeciesMapRoot");
+    }
+
+    private void EnsureBasketDisplay()
+    {
+        BasketDisplay = FindFirstObjectByType<BasketDisplay>();
+        if (BasketDisplay == null)
+        {
+            GameObject basketDisplayObject = new GameObject("BasketDisplay");
+            basketDisplayObject.transform.SetParent(WorkspaceRoot, false);
+            basketDisplayObject.transform.position = new Vector3(-0.85f, -4.2f, 0f);
+            BasketDisplay = basketDisplayObject.AddComponent<BasketDisplay>();
+        }
+        else
+        {
+            ParentToWorkspace(BasketDisplay.transform);
         }
 
-        inventoryView.Initialize(Inventory, Bouquet, BouquetOrders);
+        BasketDisplay.Initialize(Inventory);
     }
 
     private void EnsureOrderSystem()
@@ -100,10 +133,9 @@ public class GameManager : MonoBehaviour
 
         Orders.InitializeDefaultOrders();
 
-        EnsureOrderRoot();
-        Orders.OrdersChanged -= RefreshOrderViews;
-        Orders.OrdersChanged += RefreshOrderViews;
-        RefreshOrderViews();
+        EnsureCurrentOrderDetailView();
+        EnsureOrderCarousel();
+        EnsureOrderMenuButton();
     }
 
     private void EnsureBouquetSystem()
@@ -120,8 +152,13 @@ public class GameManager : MonoBehaviour
         if (bouquetDropZone == null)
         {
             GameObject bouquetDropZoneObject = new GameObject("BouquetDropZone");
-            bouquetDropZoneObject.transform.position = new Vector3(4.25f, -3.25f, 0f);
+            bouquetDropZoneObject.transform.SetParent(WorkspaceRoot, false);
+            bouquetDropZoneObject.transform.position = new Vector3(2.75f, -4.2f, 0f);
             bouquetDropZone = bouquetDropZoneObject.AddComponent<BouquetDropZone>();
+        }
+        else
+        {
+            ParentToWorkspace(bouquetDropZone.transform);
         }
 
         bouquetDropZone.Initialize(Bouquet, Orders);
@@ -141,11 +178,17 @@ public class GameManager : MonoBehaviour
         if (bouquetLayoutView == null)
         {
             GameObject bouquetLayoutObject = new GameObject("BouquetLayoutView");
-            bouquetLayoutObject.transform.position = new Vector3(-4.25f, -2.85f, 0f);
+            bouquetLayoutObject.transform.SetParent(WorkspaceRoot, false);
+            bouquetLayoutObject.transform.position = new Vector3(-2.65f, -3.45f, 0f);
             bouquetLayoutView = bouquetLayoutObject.AddComponent<BouquetLayoutView>();
+        }
+        else
+        {
+            ParentToWorkspace(bouquetLayoutView.transform);
         }
 
         bouquetLayoutView.Initialize(BouquetOrders);
+        EnsureBouquetSubmitView();
     }
 
     private void EnsureChargeHarvestSystem()
@@ -163,53 +206,152 @@ public class GameManager : MonoBehaviour
         }
 
         ChargeHarvest.Initialize(ChargeHarvestConfig);
+
+        GameObject chargeHarvestUi = GameObject.Find("ChargeHarvestUI");
+        if (chargeHarvestUi != null)
+        {
+            ParentToWorkspace(chargeHarvestUi.transform);
+        }
     }
 
-    private void EnsureOrderRoot()
+    private void EnsureOrderCarousel()
     {
-        if (orderRoot != null)
+        if (orderCarouselView == null)
         {
-            return;
+            orderCarouselView = FindFirstObjectByType<OrderCarouselView>();
         }
 
-        GameObject orderRootObject = GameObject.Find("OrderRoot");
-        if (orderRootObject == null)
+        if (orderCarouselView == null)
         {
-            orderRootObject = new GameObject("OrderRoot");
-            orderRootObject.transform.position = new Vector3(4.25f, 0f, 0f);
+            GameObject carouselObject = new GameObject("OrderCarouselView");
+            carouselObject.transform.SetParent(WorkspaceRoot, false);
+            carouselObject.transform.position = new Vector3(0f, 0.35f, 0f);
+            orderCarouselView = carouselObject.AddComponent<OrderCarouselView>();
+        }
+        else
+        {
+            ParentToWorkspace(orderCarouselView.transform);
         }
 
-        orderRoot = orderRootObject.transform;
+        orderCarouselView.Initialize(Orders);
     }
 
-    private void RefreshOrderViews()
+    private void EnsureCurrentOrderDetailView()
     {
-        EnsureOrderRoot();
-        ClearOrderViews();
-
-        for (int i = 0; i < Orders.ActiveOrders.Count; i++)
+        if (currentOrderDetailView == null)
         {
-            OrderData order = Orders.ActiveOrders[i];
-            GameObject orderViewObject = new GameObject($"OrderView_{order.Id}");
-            orderViewObject.transform.SetParent(orderRoot, false);
-            orderViewObject.transform.localPosition = new Vector3(0f, -i * 1.45f, 0f);
-
-            OrderView orderView = orderViewObject.AddComponent<OrderView>();
-            orderView.Initialize(Orders, order);
-            orderViews.Add(orderView);
+            currentOrderDetailView = FindFirstObjectByType<CurrentOrderDetailView>();
         }
+
+        if (currentOrderDetailView == null)
+        {
+            GameObject detailObject = new GameObject("CurrentOrderDetailView");
+            detailObject.transform.SetParent(WorkspaceRoot, false);
+            detailObject.transform.position = new Vector3(0f, 4.35f, 0f);
+            currentOrderDetailView = detailObject.AddComponent<CurrentOrderDetailView>();
+        }
+        else
+        {
+            ParentToWorkspace(currentOrderDetailView.transform);
+        }
+
+        currentOrderDetailView.Initialize(Orders);
     }
 
-    private void ClearOrderViews()
+    private void EnsureOrderMenuButton()
     {
-        for (int i = 0; i < orderViews.Count; i++)
+        if (orderMenuButton == null)
         {
-            if (orderViews[i] != null)
-            {
-                Destroy(orderViews[i].gameObject);
-            }
+            orderMenuButton = FindFirstObjectByType<OrderMenuButton>();
         }
 
-        orderViews.Clear();
+        if (orderMenuButton == null)
+        {
+            GameObject buttonObject = new GameObject("OrderMenuButton");
+            buttonObject.transform.SetParent(WorkspaceRoot, false);
+            buttonObject.transform.position = new Vector3(2.95f, 4.25f, 0f);
+            orderMenuButton = buttonObject.AddComponent<OrderMenuButton>();
+        }
+        else
+        {
+            ParentToWorkspace(orderMenuButton.transform);
+        }
+
+        orderMenuButton.Initialize(orderCarouselView);
     }
+
+    private void EnsureBouquetSubmitView()
+    {
+        if (bouquetSubmitView == null)
+        {
+            bouquetSubmitView = FindFirstObjectByType<BouquetSubmitView>();
+        }
+
+        if (bouquetSubmitView == null)
+        {
+            GameObject submitObject = new GameObject("BouquetSubmitView");
+            submitObject.transform.SetParent(WorkspaceRoot, false);
+            submitObject.transform.position = new Vector3(-2.65f, -4.55f, 0f);
+            bouquetSubmitView = submitObject.AddComponent<BouquetSubmitView>();
+        }
+        else
+        {
+            ParentToWorkspace(bouquetSubmitView.transform);
+        }
+
+        bouquetSubmitView.Initialize(BouquetOrders);
+    }
+
+    private void EnsureCurrencyGateway()
+    {
+        Currency = GetComponent<CurrencyGateway>();
+        if (Currency == null)
+        {
+            Currency = gameObject.AddComponent<CurrencyGateway>();
+        }
+
+        Currency.Initialize();
+    }
+
+    private void EnsureHarvestFlyToBasketSystem()
+    {
+        HarvestFlyToBasket = GetComponent<HarvestFlyToBasketSystem>();
+        if (HarvestFlyToBasket == null)
+        {
+            HarvestFlyToBasket = gameObject.AddComponent<HarvestFlyToBasketSystem>();
+        }
+    }
+
+    private void EnsureFlowerSpeciesMap()
+    {
+        FlowerSpeciesMap = GetComponent<FlowerSpeciesMapController>();
+        if (FlowerSpeciesMap == null)
+        {
+            FlowerSpeciesMap = gameObject.AddComponent<FlowerSpeciesMapController>();
+        }
+
+        FlowerSpeciesMap.Initialize(Currency, branchFactory, MapRoot, WorkspaceRoot);
+    }
+
+    private Transform EnsureRoot(string rootName)
+    {
+        Transform existing = transform.Find(rootName);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject rootObject = new GameObject(rootName);
+        rootObject.transform.SetParent(transform, false);
+        return rootObject.transform;
+    }
+
+    private void ParentToWorkspace(Transform target)
+    {
+        if (target != null && WorkspaceRoot != null && target.parent != WorkspaceRoot)
+        {
+            target.SetParent(WorkspaceRoot, true);
+        }
+    }
+
 }

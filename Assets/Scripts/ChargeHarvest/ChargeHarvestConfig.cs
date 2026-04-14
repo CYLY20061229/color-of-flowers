@@ -18,7 +18,7 @@ public class ChargeHarvestConfig : MonoBehaviour
     [SerializeField] private KeyCode debugStartKey = KeyCode.H;
 
     [Header("World UI")]
-    [SerializeField] private Vector3 panelWorldPosition = new Vector3(-5.6f, 0.25f, 0f);
+    [SerializeField] private Vector3 panelWorldPosition = new Vector3(-2.15f, -0.15f, 0f);
 
     public float ChargeDurationSeconds => chargeDurationSeconds;
     public float ResultDisplaySeconds => resultDisplaySeconds;

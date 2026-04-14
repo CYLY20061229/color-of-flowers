@@ -1,12 +1,15 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class FlowerDragToSlotHandler : MonoBehaviour
 {
+    private const float SnapDistance = 1.2f;
+
     private FlowerColor color;
     private BouquetOrderManager bouquetOrderManager;
     private Camera mainCamera;
     private GameObject ghostObject;
     private Sprite grownSprite;
+    private BouquetSlotView previewSlot;
 
     public void Initialize(FlowerColor flowerColor, BouquetOrderManager manager)
     {
@@ -25,6 +28,7 @@ public class FlowerDragToSlotHandler : MonoBehaviour
         EnsureGhost();
         ghostObject.SetActive(true);
         ghostObject.transform.position = GetMouseWorldPosition();
+        UpdatePreviewSlot(ghostObject.transform.position);
     }
 
     private void OnMouseDrag()
@@ -35,6 +39,7 @@ public class FlowerDragToSlotHandler : MonoBehaviour
         }
 
         ghostObject.transform.position = GetMouseWorldPosition();
+        UpdatePreviewSlot(ghostObject.transform.position);
     }
 
     private void OnMouseUp()
@@ -44,12 +49,13 @@ public class FlowerDragToSlotHandler : MonoBehaviour
             return;
         }
 
-        BouquetSlotView slotView = FindSlotUnderMouse();
+        BouquetSlotView slotView = FindBestSlot(GetMouseWorldPosition());
         if (slotView != null)
         {
             bouquetOrderManager.TryPlaceFlower(slotView.SlotState.SlotIndex, color);
         }
 
+        ClearPreviewSlot();
         ghostObject.SetActive(false);
     }
 
@@ -58,9 +64,9 @@ public class FlowerDragToSlotHandler : MonoBehaviour
         return bouquetOrderManager != null && bouquetOrderManager.HasActiveBouquetOrder;
     }
 
-    private BouquetSlotView FindSlotUnderMouse()
+    private BouquetSlotView FindBestSlot(Vector3 worldPosition)
     {
-        Vector2 mousePoint = GetMouseWorldPosition();
+        Vector2 mousePoint = worldPosition;
         Collider2D[] hits = Physics2D.OverlapPointAll(mousePoint);
 
         for (int i = 0; i < hits.Length; i++)
@@ -72,7 +78,36 @@ public class FlowerDragToSlotHandler : MonoBehaviour
             }
         }
 
-        return null;
+        return BouquetSlotView.FindClosestSlot(worldPosition, SnapDistance);
+    }
+
+    private void UpdatePreviewSlot(Vector3 worldPosition)
+    {
+        BouquetSlotView nextSlot = FindBestSlot(worldPosition);
+        if (nextSlot == previewSlot)
+        {
+            return;
+        }
+
+        if (previewSlot != null)
+        {
+            previewSlot.SetPreviewHighlight(false);
+        }
+
+        previewSlot = nextSlot;
+        if (previewSlot != null)
+        {
+            previewSlot.SetPreviewHighlight(true);
+        }
+    }
+
+    private void ClearPreviewSlot()
+    {
+        if (previewSlot != null)
+        {
+            previewSlot.SetPreviewHighlight(false);
+            previewSlot = null;
+        }
     }
 
     private void EnsureGhost()

@@ -2,8 +2,8 @@ using UnityEngine;
 
 public class ChargeBarController : MonoBehaviour
 {
-    private const float BarWidth = 0.42f;
-    private const float BarHeight = 3.2f;
+    private const float BarWidth = 0.32f;
+    private const float BarHeight = 2.35f;
 
     private GameObject badZoneLow;
     private GameObject goodZoneLow;
@@ -35,9 +35,9 @@ public class ChargeBarController : MonoBehaviour
             return;
         }
 
-        frame = SimpleShapeFactory.CreateRectangle("Frame", transform, new Vector2(BarWidth + 0.12f, BarHeight + 0.12f), new Color(0.95f, 0.95f, 0.95f, 1f), 31);
+        frame = SimpleShapeFactory.CreateRectangle("Frame", transform, new Vector2(BarWidth + 0.09f, BarHeight + 0.09f), new Color(0.95f, 0.95f, 0.95f, 1f), 31);
         CreateZoneVisuals();
-        fillBar = SimpleShapeFactory.CreateRectangle("FillBar", transform, new Vector2(BarWidth - 0.12f, BarHeight), new Color(1f, 1f, 1f, 0.55f), 33);
+        fillBar = SimpleShapeFactory.CreateRectangle("FillBar", transform, new Vector2(BarWidth - 0.09f, BarHeight), new Color(1f, 1f, 1f, 0.55f), 33);
     }
 
     private void CreateZoneVisuals()

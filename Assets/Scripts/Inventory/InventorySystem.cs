@@ -9,16 +9,38 @@ public class InventorySystem : MonoBehaviour
     public event Action InventoryChanged;
 
     public IReadOnlyList<FlowerData> Flowers => flowers;
+    public bool IsFull => !CanAddFlower();
 
     public void AddFlower(FlowerData flower)
     {
+        TryAddFlower(flower);
+    }
+
+    public bool CanAddFlower()
+    {
+        if (GameManager.Instance == null || GameManager.Instance.BasketDisplay == null)
+        {
+            return true;
+        }
+
+        return GameManager.Instance.BasketDisplay.HasEmptySlot;
+    }
+
+    public bool TryAddFlower(FlowerData flower)
+    {
         if (flower == null)
         {
-            return;
+            return false;
+        }
+
+        if (!CanAddFlower())
+        {
+            return false;
         }
 
         flowers.Add(flower);
         InventoryChanged?.Invoke();
+        return true;
     }
 
     public bool TryRemoveFlower(FlowerColor color)

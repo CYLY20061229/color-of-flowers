@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -76,17 +76,30 @@ public class OrderSystem : MonoBehaviour
     private OrderData CreateOrder(int id)
     {
         BouquetOrderData bouquetOrder;
+        string customerName;
+        string chatSummary;
+        int rewardCoins;
+
         switch ((id - 1) % 4)
         {
             case 0:
                 bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Magenta, FlowerColor.Red, FlowerColor.Red);
-                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
+                customerName = "Luna";
+                chatSummary = "微信留言：想要一束偏暖色的花，顶部更亮一点，准备送给朋友。";
+                rewardCoins = 25;
+                break;
             case 1:
                 bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Cyan, FlowerColor.Green, FlowerColor.Green);
-                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
+                customerName = "Mika";
+                chatSummary = "私信需求：整体想要清新一些，中间简单一点，感觉柔和干净。";
+                rewardCoins = 28;
+                break;
             case 2:
                 bouquetOrder = BouquetTemplateFactory.CreateThreeFlowerTemplate(id, FlowerColor.Yellow, FlowerColor.Blue, FlowerColor.Blue);
-                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
+                customerName = "Noah";
+                chatSummary = "聊天摘要：希望有一点亮黄色点缀，再用冷色把它衬出来。";
+                rewardCoins = 30;
+                break;
             default:
                 bouquetOrder = BouquetTemplateFactory.CreateFiveFlowerTemplate(
                     id,
@@ -95,7 +108,42 @@ public class OrderSystem : MonoBehaviour
                     FlowerColor.Green,
                     FlowerColor.Blue,
                     FlowerColor.Yellow);
-                return new OrderData(id, BouquetTemplateFactory.BuildCountRequirements(bouquetOrder), bouquetOrder);
+                customerName = "Iris";
+                chatSummary = "聊天摘要：想要层次更丰富的花束，中心柔和一些，周围颜色分开。";
+                rewardCoins = 42;
+                break;
         }
+
+        return new OrderData(
+            id,
+            customerName,
+            chatSummary,
+            BuildDisplayRequirements(bouquetOrder),
+            bouquetOrder,
+            null,
+            null,
+            rewardCoins);
+    }
+
+    private static List<OrderRequirement> BuildDisplayRequirements(BouquetOrderData bouquetOrder)
+    {
+        List<OrderRequirement> requirements = new List<OrderRequirement>();
+        if (bouquetOrder == null)
+        {
+            return requirements;
+        }
+
+        for (int i = 0; i < bouquetOrder.Slots.Count; i++)
+        {
+            BouquetSlotRequirement slot = bouquetOrder.Slots[i];
+            if (!slot.IsRequired)
+            {
+                continue;
+            }
+
+            requirements.Add(new OrderRequirement(slot.RequiredFlowerColor, 1, slot.SlotIndex));
+        }
+
+        return requirements;
     }
 }
